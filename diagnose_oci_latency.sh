@@ -9,16 +9,26 @@
 #   ./diagnose_oci_latency.sh 10.50.20.15 ent0 PRODDB /tmp/test.sql
 # -------------------------------------------------------------
 
-if [ $# -ne 4 ]; then
-    echo "Uso: $0 <IP_DB_OCI> <INTERFACE> <TNS_ALIAS> <SQL_FILE>"
-    echo "Ejemplo: $0 10.50.20.15 ent0 ORCL_PDB1 /tmp/test.sql"
+if [ $# -lt 3 ] || [ $# -gt 4 ]; then
+    echo "Uso: $0 <IP_DB_OCI> <INTERFACE> <TNS_ALIAS> [SQL_FILE]"
+    echo "Ejemplo (con SQL): $0 10.50.20.15 ent0 ORCL_PDB1 /tmp/test.sql"
+    echo "Ejemplo (sin SQL):  $0 10.50.20.15 ent0 ORCL_PDB1"
     exit 1
 fi
 
 DBIP=$1
 IFACE=$2
 DBALIAS=$3
-SQLFILE=$4
+SQLFILE=
+if [ $# -eq 4 ]; then
+    SQLFILE=$4
+fi
+
+# Decide whether to run PL/SQL execution. Treat empty or /dev/null as "no".
+RUN_SQL=0
+if [ -n "$SQLFILE" ] && [ "$SQLFILE" != "/dev/null" ]; then
+    RUN_SQL=1
+fi
 
 OUTFILE="oci_diagnosis_$(date +%Y%m%d_%H%M%S).log"
 PCAPFILE="/tmp/oci_tcpdump_$(date +%Y%m%d_%H%M%S).pcap"
@@ -29,7 +39,11 @@ echo "Fecha: $(date)" | tee -a $OUTFILE
 echo "IP DB OCI: $DBIP" | tee -a $OUTFILE
 echo "Interfaz: $IFACE" | tee -a $OUTFILE
 echo "TNS Alias: $DBALIAS" | tee -a $OUTFILE
-echo "SQL File: $SQLFILE" | tee -a $OUTFILE
+if [ -n "$SQLFILE" ]; then
+    echo "SQL File: $SQLFILE" | tee -a $OUTFILE
+else
+    echo "SQL File: (none) — PL/SQL execution will be skipped" | tee -a $OUTFILE
+fi
 echo "===================================================" | tee -a $OUTFILE
 
 
@@ -77,7 +91,13 @@ ping -c 20 $DBIP | tee -a $OUTFILE
 if command -v sqlplus >/dev/null 2>&1; then
     echo "\n[6] SQL*Net handshake (sqlplus test)" | tee -a $OUTFILE
     echo "----------------------------------------" | tee -a $OUTFILE
-    echo "set timing on; select 1 from dual;" | sqlplus -s /nolog | tee -a $OUTFILE
+    # Use the TNS alias to attempt a lightweight connect and simple query
+    sqlplus -s /nolog <<EOF | tee -a $OUTFILE
+conn /@${DBALIAS}
+set timing on;
+select 1 from dual;
+exit;
+EOF
 else
     echo "\n[6] SQLNet: sqlplus no está instalado." | tee -a $OUTFILE
 fi
@@ -117,10 +137,11 @@ echo "\nTcpdump almacenado en: $PCAPFILE" | tee -a $OUTFILE
 echo "\n[10] Ejecutando PL/SQL / SQL para medición real" | tee -a $OUTFILE
 echo "----------------------------------------" | tee -a $OUTFILE
 
-if command -v sqlplus >/dev/null 2>&1; then
-    echo "Ejecutando: $SQLFILE" | tee -a $OUTFILE
+if [ "$RUN_SQL" -eq 1 ]; then
+    if command -v sqlplus >/dev/null 2>&1; then
+        echo "Ejecutando: $SQLFILE" | tee -a $OUTFILE
 
-    sqlplus -s /nolog <<EOF | tee -a $OUTFILE
+        sqlplus -s /nolog <<EOF | tee -a $OUTFILE
 conn /@${DBALIAS}
 set timing on;
 set serveroutput on;
@@ -128,8 +149,11 @@ set serveroutput on;
 exit;
 EOF
 
+    else
+        echo "sqlplus no instalado. No se puede ejecutar el PL/SQL." | tee -a $OUTFILE
+    fi
 else
-    echo "sqlplus no instalado. No se puede ejecutar el PL/SQL." | tee -a $OUTFILE
+    echo "PL/SQL execution skipped (no SQL file provided)." | tee -a $OUTFILE
 fi
 
 
