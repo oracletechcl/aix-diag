@@ -21,19 +21,24 @@ This repository contains a small diagnostic script for AIX systems that helps tr
 
 **Usage**
 ```
-./diagnose_oci_latency.sh <IP_DB_OCI> <INTERFACE> <TNS_ALIAS> <SQL_FILE>
+./diagnose_oci_latency.sh <IP_DB_OCI> <INTERFACE> <TNS_ALIAS> [SQL_FILE]
 ```
 
-Example:
+Example (with SQL file):
 ```
 ./diagnose_oci_latency.sh 10.50.20.15 ent0 ORCL_PDB1 /tmp/test.sql
+```
+
+Example (without SQL execution — skip PL/SQL):
+```
+./diagnose_oci_latency.sh 10.50.20.15 ent0 ORCL_PDB1
 ```
 
 Notes:
 - `<IP_DB_OCI>`: IP address of the Oracle DB / OCI endpoint.
 - `<INTERFACE>`: AIX network interface name (for example `ent0`).
 - `<TNS_ALIAS>`: TNS alias configured in `tnsnames.ora` used by `sqlplus`.
-- `<SQL_FILE>`: Path to a SQL/PLSQL script to run (optional for timing tests; must be readable).
+- `[SQL_FILE]`: Optional path to a SQL/PLSQL script to run. If omitted or if you pass `/dev/null`, the script will skip PL/SQL execution and only perform network diagnostics.
 
 **Output**
 - The script creates a timestamped log file named `oci_diagnosis_<YYYYMMDD_HHMMSS>.log` in the working directory.
