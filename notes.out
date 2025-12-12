@@ -1,0 +1,9 @@
+Origen Rama 1:
+A1016P - 192.168.84.67
+destino OCI: 100.112.1.74
+port:1521
+
+Origen Rama 2:
+A1017P - 192.168.84.68
+destino OCI: 100.112.1.75
+port:1521
