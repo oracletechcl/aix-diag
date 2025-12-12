@@ -9,10 +9,11 @@
 #   ./diagnose_oci_latency.sh 10.50.20.15 ent0 PRODDB /tmp/test.sql
 # -------------------------------------------------------------
 
-if [ $# -lt 3 ] || [ $# -gt 4 ]; then
-    echo "Uso: $0 <IP_DB_OCI> <INTERFACE> <TNS_ALIAS> [SQL_FILE]"
-    echo "Ejemplo (con SQL): $0 10.50.20.15 ent0 ORCL_PDB1 /tmp/test.sql"
-    echo "Ejemplo (sin SQL):  $0 10.50.20.15 ent0 ORCL_PDB1"
+if [ $# -lt 3 ] || [ $# -gt 5 ]; then
+    echo "Uso: $0 <IP_DB_OCI> <INTERFACE> <TNS_ALIAS> [SQL_FILE] [TCPDUMP_SECONDS]"
+    echo "Ejemplo (con SQL y duración): $0 10.50.20.15 ent0 ORCL_PDB1 /tmp/test.sql 120"
+    echo "Ejemplo (solo duración, sin SQL): $0 10.50.20.15 ent0 ORCL_PDB1 120"
+    echo "Ejemplo (sin SQL y duración por defecto 60s):  $0 10.50.20.15 ent0 ORCL_PDB1"
     exit 1
 fi
 
@@ -20,8 +21,29 @@ DBIP=$1
 IFACE=$2
 DBALIAS=$3
 SQLFILE=
-if [ $# -eq 4 ]; then
-    SQLFILE=$4
+# default tcpdump duration (seconds)
+DURATION=60
+
+# Interpret optional 4th and 5th args. Support two forms:
+# 1) <...> <TNS_ALIAS> <SQL_FILE> <TCPDUMP_SECONDS>
+# 2) <...> <TNS_ALIAS> <TCPDUMP_SECONDS>  (no SQL file)
+if [ $# -ge 4 ]; then
+    arg4="$4"
+    if echo "$arg4" | grep -Eq '^[0-9]+$'; then
+        # 4th arg is numeric -> treat as duration
+        DURATION=$arg4
+    else
+        SQLFILE=$arg4
+    fi
+fi
+
+if [ $# -ge 5 ]; then
+    arg5="$5"
+    if echo "$arg5" | grep -Eq '^[0-9]+$'; then
+        DURATION=$arg5
+    else
+        echo "Aviso: quinto argumento no es numérico, usando duración por defecto ${DURATION}s"
+    fi
 fi
 
 # Decide whether to run PL/SQL execution. Treat empty or /dev/null as "no".
@@ -44,6 +66,7 @@ if [ -n "$SQLFILE" ]; then
 else
     echo "SQL File: (none) — PL/SQL execution will be skipped" | tee -a $OUTFILE
 fi
+echo "Tcpdump duration: ${DURATION}s" | tee -a $OUTFILE
 echo "===================================================" | tee -a $OUTFILE
 
 
@@ -120,12 +143,12 @@ svmon -G | tee -a $OUTFILE
 # -------------------------------------------------------------
 # 9. Iniciar tcpdump filtrado (60s)
 # -------------------------------------------------------------
-echo "\n[9] Iniciando tcpdump 60s hacia DB OCI ($DBIP:1521)" | tee -a $OUTFILE
+echo "\n[9] Iniciando tcpdump ${DURATION}s hacia DB OCI ($DBIP:1521)" | tee -a $OUTFILE
 echo "----------------------------------------" | tee -a $OUTFILE
 
 /usr/sbin/tcpdump -i $IFACE -s 0 -w $PCAPFILE "host $DBIP and port 1521" &
 TCPDUMP_PID=$!
-sleep 60
+sleep $DURATION
 kill $TCPDUMP_PID
 
 echo "\nTcpdump almacenado en: $PCAPFILE" | tee -a $OUTFILE

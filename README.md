@@ -4,71 +4,57 @@
 
 This repository contains a small diagnostic script for AIX systems that helps triage network latency and Oracle DB (OCI) connectivity issues by collecting network, TCP, interface, and PL/SQL timing information.
 
-**What it does**
+## What it does
 - **Collects network config:** runs `ifconfig` and interface attributes for the specified network device.
 - **Gathers TCP parameters and metrics:** uses `no -a`, `netstat`, and other commands to show retransmissions and socket buffer settings.
 - **Performs connectivity checks:** runs `traceroute` and `ping` toward the target Oracle DB IP.
-- **Captures a short tcpdump:** records 60 seconds of traffic on port `1521` to a `pcap` file for offline analysis.
+- **Captures a short tcpdump:** records traffic on port `1521` to a `pcap` file for offline analysis (duration configurable).
 - **Executes PL/SQL / SQL script (optional):** runs the provided SQL file via `sqlplus` (if available) while measuring timings.
 
-**Files**
+## Files
 - `diagnose_oci_latency.sh`: Main diagnostic script.
 
-**Requirements**
+## Requirements
 - **Shell:** The script uses `ksh` (`#!/bin/ksh`) but works on systems with Bourne-like shells if `ksh` is available.
 - **Permissions:** Must be run with a user that can execute `tcpdump` and network commands; `root` is usually required for `tcpdump` and some interface diagnostics.
 - **Optional tools:** `sqlplus` (for PL/SQL execution), `tcpdump`, `traceroute`, `ping`, `entstat`, `svmon`, `vmstat`.
 
-**Usage**
+## Usage
 ```
-./diagnose_oci_latency.sh <IP_DB_OCI> <INTERFACE> <TNS_ALIAS> [SQL_FILE]
-```
-
-Example (with SQL file):
-```
-./diagnose_oci_latency.sh 10.50.20.15 ent0 ORCL_PDB1 /tmp/test.sql
+./diagnose_oci_latency.sh <IP_DB_OCI> <INTERFACE> <TNS_ALIAS> [SQL_FILE] [TCPDUMP_SECONDS]
 ```
 
-Example (without SQL execution — skip PL/SQL):
+### Examples
 ```
+# Full run with SQL and 2-minute tcpdump
+./diagnose_oci_latency.sh 10.50.20.15 ent0 ORCL_PDB1 /tmp/test.sql 120
+
+# Run without SQL and use 30s tcpdump
+./diagnose_oci_latency.sh 10.50.20.15 ent0 ORCL_PDB1 30
+
+# Run with default tcpdump duration (60s) and no SQL
 ./diagnose_oci_latency.sh 10.50.20.15 ent0 ORCL_PDB1
 ```
 
-Notes:
+### Notes
 - `<IP_DB_OCI>`: IP address of the Oracle DB / OCI endpoint.
 - `<INTERFACE>`: AIX network interface name (for example `ent0`).
 - `<TNS_ALIAS>`: TNS alias configured in `tnsnames.ora` used by `sqlplus`.
 - `[SQL_FILE]`: Optional path to a SQL/PLSQL script to run. If omitted or if you pass `/dev/null`, the script will skip PL/SQL execution and only perform network diagnostics.
+- `[TCPDUMP_SECONDS]`: Optional integer seconds to run tcpdump (default: `60`). You can provide this either as the 4th argument (when skipping SQL) or the 5th argument (when providing a SQL file).
 
-**Output**
+## Output
 - The script creates a timestamped log file named `oci_diagnosis_<YYYYMMDD_HHMMSS>.log` in the working directory.
 - It also creates a tcpdump capture at `/tmp/oci_tcpdump_<YYYYMMDD_HHMMSS>.pcap`.
 
-**Examples**
-- Quick run (no PL/SQL execution):
-```
-./diagnose_oci_latency.sh 10.50.20.15 ent0 ORCL_PDB1 /dev/null
-```
-- Full run with SQL file:
-```
-./diagnose_oci_latency.sh 10.50.20.15 ent0 ORCL_PDB1 /tmp/test.sql
-```
-
-**Troubleshooting & tips**
+## Troubleshooting & tips
 - If `tcpdump` fails: confirm you have sufficient privileges (try `sudo` or run as `root`).
 - If `sqlplus` is missing: install Oracle client tools or skip PL/SQL step by passing `/dev/null` as the `SQL_FILE`.
 - If interface commands like `entstat` are not found: ensure the AIX networking tools are installed and that you're on AIX.
 - To analyze the `pcap`: copy it to a workstation and open with Wireshark or use `tshark`.
 
-**Security notice**
+## Security notice
 - The script may capture sensitive network traffic (including DB traffic). Store and share the generated `pcap` and logs securely.
 
-**Contributing**
+## Contributing
 - Feel free to open issues or PRs to improve diagnostics, add more checks, or adapt for other UNIX variants.
-
-**License**
-- No license specified. Add a `LICENSE` file if you want to clarify reuse terms.
-
---
-Generated: `diagnose_oci_latency.sh` documentation
-# aix-diag
