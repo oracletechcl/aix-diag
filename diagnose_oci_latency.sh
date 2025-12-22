@@ -160,17 +160,127 @@ echo "----------------------------------------" | tee -a $OUTFILE
 entstat -d $IFACE | tee -a $OUTFILE
 
 # -------------------------------------------------------------
-# 8. CPU y memoria general
+# 8. CPU Diagnostics (Detailed)
 # -------------------------------------------------------------
-echo "\n[8] Utilización del sistema (CPU, memoria)" | tee -a $OUTFILE
+echo "\n[8] CPU Diagnostics" | tee -a $OUTFILE
 echo "----------------------------------------" | tee -a $OUTFILE
-vmstat 1 5 | tee -a $OUTFILE
-svmon -G | tee -a $OUTFILE
+echo "8.1) CPU configuration:" | tee -a $OUTFILE
+lsdev -Cc processor | tee -a $OUTFILE
+lsattr -El proc0 | tee -a $OUTFILE
+echo "\n8.2) CPU utilization (vmstat 1 10):" | tee -a $OUTFILE
+vmstat 1 10 | tee -a $OUTFILE
+echo "\n8.3) CPU statistics per processor:" | tee -a $OUTFILE
+mpstat -a 1 5 | tee -a $OUTFILE
+echo "\n8.4) Process-level CPU consumers (top 20):" | tee -a $OUTFILE
+ps aux | head -1 | tee -a $OUTFILE
+ps aux | sort -rn -k 3 | head -20 | tee -a $OUTFILE
+echo "\n8.5) Load averages and run queue:" | tee -a $OUTFILE
+uptime | tee -a $OUTFILE
+echo "\n8.6) Scheduler statistics:" | tee -a $OUTFILE
+vmstat -s | grep -E "context switch|forks|interrupts" | tee -a $OUTFILE
 
 # -------------------------------------------------------------
-# 9. Iniciar tcpdump filtrado (60s)
+# 9. Memory Diagnostics (Detailed)
 # -------------------------------------------------------------
-echo "\n[9] Iniciando tcpdump ${DURATION}s hacia DB OCI ($DBIP:${DBPORT})" | tee -a $OUTFILE
+echo "\n[9] Memory Diagnostics" | tee -a $OUTFILE
+echo "----------------------------------------" | tee -a $OUTFILE
+echo "9.1) Global memory summary (svmon -G):" | tee -a $OUTFILE
+svmon -G | tee -a $OUTFILE
+echo "\n9.2) Memory by segment (svmon -P -t 10):" | tee -a $OUTFILE
+svmon -P -t 10 | tee -a $OUTFILE
+echo "\n9.3) Paging space utilization:" | tee -a $OUTFILE
+lsps -a | tee -a $OUTFILE
+lsps -s | tee -a $OUTFILE
+echo "\n9.4) Page faults and I/O statistics:" | tee -a $OUTFILE
+vmstat -s | grep -E "page fault|paging|reclaims" | tee -a $OUTFILE
+echo "\n9.5) Top memory consuming processes (top 20):" | tee -a $OUTFILE
+ps aux | head -1 | tee -a $OUTFILE
+ps aux | sort -rn -k 4 | head -20 | tee -a $OUTFILE
+echo "\n9.6) Detailed process memory usage:" | tee -a $OUTFILE
+svmon -Pu -t 10 | tee -a $OUTFILE
+
+# -------------------------------------------------------------
+# 10. Disk I/O Diagnostics
+# -------------------------------------------------------------
+echo "\n[10] Disk I/O Diagnostics" | tee -a $OUTFILE
+echo "----------------------------------------" | tee -a $OUTFILE
+echo "10.1) Disk statistics (iostat):" | tee -a $OUTFILE
+iostat -D 1 5 | tee -a $OUTFILE
+echo "\n10.2) Detailed disk adapter statistics:" | tee -a $OUTFILE
+iostat -A 1 5 | tee -a $OUTFILE
+echo "\n10.3) Filesystem usage:" | tee -a $OUTFILE
+df -g | tee -a $OUTFILE
+echo "\n10.4) Inode usage:" | tee -a $OUTFILE
+df -i | tee -a $OUTFILE
+echo "\n10.5) LVM information:" | tee -a $OUTFILE
+lsvg | tee -a $OUTFILE
+for vg in $(lsvg); do
+    echo "\nVolume Group: $vg" | tee -a $OUTFILE
+    lsvg $vg | tee -a $OUTFILE
+done
+echo "\n10.6) Top I/O consuming processes:" | tee -a $OUTFILE
+ps aux | head -1 | tee -a $OUTFILE
+ps gv | sort -rn -k 10 | head -20 | tee -a $OUTFILE
+
+# -------------------------------------------------------------
+# 11. Process and Thread Analysis
+# -------------------------------------------------------------
+echo "\n[11] Process and Thread Analysis" | tee -a $OUTFILE
+echo "----------------------------------------" | tee -a $OUTFILE
+echo "11.1) Process count:" | tee -a $OUTFILE
+ps -ef | wc -l | tee -a $OUTFILE
+echo "\n11.2) Zombie processes:" | tee -a $OUTFILE
+ps -ef | grep defunct | grep -v grep | tee -a $OUTFILE
+echo "\n11.3) Oracle processes (if any):" | tee -a $OUTFILE
+ps -ef | grep -i oracle | grep -v grep | tee -a $OUTFILE
+echo "\n11.4) Waiting/blocked processes:" | tee -a $OUTFILE
+ps -efl | grep -E " [DUSZ] " | head -20 | tee -a $OUTFILE
+
+# -------------------------------------------------------------
+# 12. System Kernel Parameters
+# -------------------------------------------------------------
+echo "\n[12] Kernel Parameters and Limits" | tee -a $OUTFILE
+echo "----------------------------------------" | tee -a $OUTFILE
+echo "12.1) Network tunable parameters:" | tee -a $OUTFILE
+no -a | tee -a $OUTFILE
+echo "\n12.2) Virtual Memory Manager parameters:" | tee -a $OUTFILE
+vmo -a | tee -a $OUTFILE
+echo "\n12.3) I/O tunable parameters:" | tee -a $OUTFILE
+ioo -a | tee -a $OUTFILE
+echo "\n12.4) System limits (ulimit):" | tee -a $OUTFILE
+ulimit -a | tee -a $OUTFILE
+
+# -------------------------------------------------------------
+# 13. Error Logs and System Health
+# -------------------------------------------------------------
+echo "\n[13] System Error Logs and Health" | tee -a $OUTFILE
+echo "----------------------------------------" | tee -a $OUTFILE
+echo "13.1) Recent error log entries:" | tee -a $OUTFILE
+errpt | head -50 | tee -a $OUTFILE
+echo "\n13.2) Hardware errors (last 24 hours):" | tee -a $OUTFILE
+errpt -a -s $(date -v -1d +%m%d%H%M%y 2>/dev/null || date --date="1 day ago" +%m%d%H%M%y 2>/dev/null || echo "010100001970") | grep -i "hardware\|memory\|cpu\|disk" | head -30 | tee -a $OUTFILE
+echo "\n13.3) System uptime and boot time:" | tee -a $OUTFILE
+uptime | tee -a $OUTFILE
+who -b | tee -a $OUTFILE
+
+# -------------------------------------------------------------
+# 14. Network Connection State
+# -------------------------------------------------------------
+echo "\n[14] Network Connection Analysis" | tee -a $OUTFILE
+echo "----------------------------------------" | tee -a $OUTFILE
+echo "14.1) Established connections:" | tee -a $OUTFILE
+netstat -an | grep ESTABLISHED | wc -l | tee -a $OUTFILE
+echo "\n14.2) Connection states summary:" | tee -a $OUTFILE
+netstat -an | awk '{print $6}' | sort | uniq -c | sort -rn | tee -a $OUTFILE
+echo "\n14.3) Connections to OCI database:" | tee -a $OUTFILE
+netstat -an | grep $DBIP | tee -a $OUTFILE
+echo "\n14.4) Socket buffer statistics:" | tee -a $OUTFILE
+netstat -m | tee -a $OUTFILE
+
+# -------------------------------------------------------------
+# 15. Iniciar tcpdump filtrado
+# -------------------------------------------------------------
+echo "\n[15] Iniciando tcpdump ${DURATION}s hacia DB OCI ($DBIP:${DBPORT})" | tee -a $OUTFILE
 echo "----------------------------------------" | tee -a $OUTFILE
 
 /usr/sbin/tcpdump -i $IFACE -s 0 -w $PCAPFILE "host $DBIP and port ${DBPORT}" &
@@ -182,9 +292,9 @@ echo "\nTcpdump almacenado en: $PCAPFILE" | tee -a $OUTFILE
 
 
 # -------------------------------------------------------------
-# 10. Ejecutar PL/SQL o query para triage (con timing)
+# 16. Ejecutar PL/SQL o query para triage (con timing)
 # -------------------------------------------------------------
-echo "\n[10] Ejecutando PL/SQL / SQL para medición real" | tee -a $OUTFILE
+echo "\n[16] Ejecutando PL/SQL / SQL para medición real" | tee -a $OUTFILE
 echo "----------------------------------------" | tee -a $OUTFILE
 
 if [ "$RUN_SQL" -eq 1 ]; then
@@ -208,9 +318,9 @@ fi
 
 
 # -------------------------------------------------------------
-# 11. Finalización
+# 17. Finalización
 # -------------------------------------------------------------
-echo "\n[11] FIN DEL DIAGNÓSTICO" | tee -a $OUTFILE
+echo "\n[17] FIN DEL DIAGNÓSTICO" | tee -a $OUTFILE
 echo "Archivo de salida: $OUTFILE" | tee -a $OUTFILE
 echo "PCAP capturado: $PCAPFILE" | tee -a $OUTFILE
 echo "Listo para análisis con Wireshark + AWR." | tee -a $OUTFILE

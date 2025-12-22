@@ -10,6 +10,13 @@ This repository contains a small diagnostic script for AIX systems that helps tr
 - **Performs connectivity checks:** runs `traceroute` and `ping` toward the target Oracle DB IP.
 - **Captures a short tcpdump:** records traffic on the specified database port to a `pcap` file for offline analysis (duration and port both configurable).
 - **Executes PL/SQL / SQL script (optional):** runs the provided SQL file via `sqlplus` (if available) while measuring timings.
+- **CPU diagnostics:** collects comprehensive CPU metrics including configuration, utilization, per-processor statistics, top consumers, load averages, and scheduler statistics.
+- **Memory diagnostics:** gathers detailed memory information including global summary, segment usage, paging space, page faults, and top memory consumers.
+- **Disk I/O diagnostics:** analyzes disk performance with iostat, filesystem usage, inode usage, LVM configuration, and I/O-intensive processes.
+- **Process analysis:** monitors process count, zombie processes, Oracle processes, and blocked/waiting processes.
+- **Kernel parameters:** captures network, virtual memory, and I/O tunable parameters plus system limits.
+- **System health checks:** reviews error logs, hardware errors, uptime, and boot time.
+- **Network connection state:** analyzes established connections, connection states, and socket buffer statistics.
 
 ## Files
 - `diagnose_oci_latency.sh`: Main diagnostic script.
@@ -17,7 +24,8 @@ This repository contains a small diagnostic script for AIX systems that helps tr
 ## Requirements
 - **Shell:** The script uses `ksh` (`#!/bin/ksh`) but works on systems with Bourne-like shells if `ksh` is available.
 - **Permissions:** Must be run with a user that can execute `tcpdump` and network commands; `root` is usually required for `tcpdump` and some interface diagnostics.
-- **Optional tools:** `sqlplus` (for PL/SQL execution), `tcpdump`, `traceroute`, `ping`, `entstat`, `svmon`, `vmstat`.
+- **Optional tools:** `sqlplus` (for PL/SQL execution), `tcpdump`, `traceroute`, `ping`, `entstat`, `svmon`, `vmstat`, `mpstat`, `iostat`, `lsdev`, `lsattr`, `lsvg`, `errpt`.
+- **Note:** Since DPI (Deep Packet Inspection) is being removed from environments, this script provides comprehensive system-level diagnostics to compensate for reduced network visibility.
 
 ## Usage
 ```
