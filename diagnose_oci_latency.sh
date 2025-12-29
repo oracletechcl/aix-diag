@@ -3,11 +3,21 @@
 # ============================================================================
 # AIX OS DIAGNOSTICS AND NETWORK CAPTURE SCRIPT
 # ============================================================================
+# *** IMPORTANT: YOU MUST RUN THIS SCRIPT AS ROOT ***
+#
+# Run as root:
+#   su -
+#   ./diagnose_oci_latency.sh <IP_DB_OCI> <LOCAL_INTERFACE> <DB_PORT> <TIME_TO_COLLECT_TCPDUMP>
+#
+# Or with sudo:
+#   sudo ./diagnose_oci_latency.sh <IP_DB_OCI> <LOCAL_INTERFACE> <DB_PORT> <TIME_TO_COLLECT_TCPDUMP>
+#
+# ============================================================================
 # USAGE (COPY AND PASTE THIS):
 #   ./diagnose_oci_latency.sh <IP_DB_OCI> <LOCAL_INTERFACE> <DB_PORT> <TIME_TO_COLLECT_TCPDUMP>
 #
 # EXAMPLE:
-#   ./diagnose_oci_latency.sh 10.50.20.15 ent0 1521 60
+#   sudo ./diagnose_oci_latency.sh 10.50.20.15 ent0 1521 60
 #
 # WHAT EACH PARAMETER MEANS:
 #   IP_DB_OCI              = The IP address of your Oracle database (example: 10.50.20.15)
@@ -19,19 +29,25 @@
 # Check if exactly 4 parameters were provided
 if [ $# -ne 4 ]; then
     echo ""
+    echo "========================================================"
     echo "ERROR: You must provide exactly 4 parameters!"
+    echo "========================================================"
+    echo ""
+    echo "*** IMPORTANT: RUN THIS SCRIPT AS ROOT ***"
     echo ""
     echo "USAGE:"
-    echo "  $0 <IP_DB_OCI> <LOCAL_INTERFACE> <DB_PORT> <TIME_TO_COLLECT_TCPDUMP>"
+    echo "  sudo $0 <IP_DB_OCI> <LOCAL_INTERFACE> <DB_PORT> <TIME_TO_COLLECT_TCPDUMP>"
     echo ""
     echo "EXAMPLE:"
-    echo "  $0 10.50.20.15 ent0 1521 60"
+    echo "  sudo $0 10.50.20.15 ent0 1521 60"
     echo ""
     echo "WHAT EACH PARAMETER MEANS:"
     echo "  IP_DB_OCI              = The IP address of your Oracle database"
     echo "  LOCAL_INTERFACE        = Your network interface (usually ent0 or similar)"
     echo "  DB_PORT                = The database port (usually 1521)"
     echo "  TIME_TO_COLLECT_TCPDUMP = How many seconds to capture network traffic"
+    echo ""
+    echo "========================================================"
     echo ""
     exit 1
 fi
@@ -174,15 +190,60 @@ uptime | tee -a $OUTFILE
 echo "\n[12] Starting TCPDUMP (${TIME_TO_COLLECT_TCPDUMP} seconds)" | tee -a $OUTFILE
 echo "----------------------------------------" | tee -a $OUTFILE
 echo "Capturing traffic to: $IP_DB_OCI:${DB_PORT}" | tee -a $OUTFILE
-echo "Please wait ${TIME_TO_COLLECT_TCPDUMP} seconds..." | tee -a $OUTFILE
 
-/usr/sbin/tcpdump -i $LOCAL_INTERFACE -s 0 -w $PCAPFILE "host $IP_DB_OCI and port ${DB_PORT}" &
+# Check if tcpdump exists
+if [ ! -x "/usr/sbin/tcpdump" ]; then
+    echo "ERROR: tcpdump not found at /usr/sbin/tcpdump" | tee -a $OUTFILE
+    echo "ERROR: Please run this script as root or with sudo" | tee -a $OUTFILE
+    exit 1
+fi
+
+# Check if running as root
+if [ "$(id -u)" -ne 0 ]; then
+    echo "WARNING: You are not running as root!" | tee -a $OUTFILE
+    echo "WARNING: tcpdump will likely FAIL without root privileges" | tee -a $OUTFILE
+    echo "WARNING: Please run: sudo $0 $*" | tee -a $OUTFILE
+    echo "" | tee -a $OUTFILE
+fi
+
+echo "Starting tcpdump... Please wait ${TIME_TO_COLLECT_TCPDUMP} seconds..." | tee -a $OUTFILE
+
+# Start tcpdump in background and capture any errors
+/usr/sbin/tcpdump -i $LOCAL_INTERFACE -s 0 -w $PCAPFILE "host $IP_DB_OCI and port ${DB_PORT}" > /tmp/tcpdump_error.$$.log 2>&1 &
 TCPDUMP_PID=$!
-sleep $TIME_TO_COLLECT_TCPDUMP
-kill $TCPDUMP_PID 2>/dev/null
 
-echo "TCPDUMP capture completed!" | tee -a $OUTFILE
-echo "PCAP file saved at: $PCAPFILE" | tee -a $OUTFILE
+# Wait a moment and check if tcpdump is still running
+sleep 2
+if ! ps -p $TCPDUMP_PID > /dev/null 2>&1; then
+    echo "ERROR: tcpdump failed to start!" | tee -a $OUTFILE
+    echo "ERROR: Check error log below:" | tee -a $OUTFILE
+    cat /tmp/tcpdump_error.$$.log | tee -a $OUTFILE
+    rm -f /tmp/tcpdump_error.$$.log
+    exit 1
+fi
+
+echo "tcpdump is running (PID: $TCPDUMP_PID)" | tee -a $OUTFILE
+
+# Wait for the specified duration
+sleep $TIME_TO_COLLECT_TCPDUMP
+
+# Send proper termination signal and WAIT for tcpdump to finish writing
+echo "Stopping tcpdump and flushing buffers..." | tee -a $OUTFILE
+kill -TERM $TCPDUMP_PID 2>/dev/null
+wait $TCPDUMP_PID 2>/dev/null
+
+# Clean up error log if no errors
+rm -f /tmp/tcpdump_error.$$.log
+
+# Verify the PCAP file was created
+if [ -f "$PCAPFILE" ]; then
+    PCAP_SIZE=$(ls -lh "$PCAPFILE" | awk '{print $5}')
+    echo "SUCCESS: TCPDUMP capture completed!" | tee -a $OUTFILE
+    echo "PCAP file saved at: $PCAPFILE (Size: $PCAP_SIZE)" | tee -a $OUTFILE
+else
+    echo "ERROR: PCAP file was NOT created at $PCAPFILE" | tee -a $OUTFILE
+    echo "ERROR: tcpdump may have failed. Check permissions and interface name." | tee -a $OUTFILE
+fi
 
 # -------------------------------------------------------------
 # 13. COMPLETION
