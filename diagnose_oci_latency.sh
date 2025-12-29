@@ -158,39 +158,81 @@ echo "----------------------------------------" | tee -a $OUTFILE
 no -a | grep -E "rfc1323|tcp_sendspace|tcp_recvspace|sb_max" | tee -a $OUTFILE
 
 # -------------------------------------------------------------
-# 3. TCP Retransmissions and Metrics
+# 3. CHECK RECOMMENDED MITIGATION SETTINGS (Oracle/OCI)
 # -------------------------------------------------------------
-echo "\n[3] TCP Retransmissions and Metrics" | tee -a $OUTFILE
+echo "\n[3] Oracle/OCI Mitigation Settings (Current Values)" | tee -a $OUTFILE
+echo "----------------------------------------" | tee -a $OUTFILE
+
+echo "\n3.1) AIX TCP Buffer Settings:" | tee -a $OUTFILE
+no -o tcp_sendspace | tee -a $OUTFILE
+no -o tcp_recvspace | tee -a $OUTFILE
+no -o rfc1323 | tee -a $OUTFILE
+
+echo "\n3.2) SQLNet Configuration Files:" | tee -a $OUTFILE
+# Try to find sqlnet.ora and tnsnames.ora in common Oracle locations
+ORACLE_HOMES=$(ps -ef | grep pmon | grep -v grep | awk '{print $8}' | sed 's/.*ora_pmon_//' | while read sid; do
+    grep "^${sid}:" /etc/oratab 2>/dev/null | cut -d: -f2
+done | sort -u)
+
+if [ -z "$ORACLE_HOMES" ]; then
+    # Try common locations if no running instances
+    ORACLE_HOMES="/oracle /u01/app/oracle"
+fi
+
+FOUND_SQLNET=0
+for OH in $ORACLE_HOMES; do
+    for NETDIR in "$OH/network/admin" "$OH/*/network/admin"; do
+        if [ -f "$NETDIR/sqlnet.ora" ]; then
+            FOUND_SQLNET=1
+            echo "\nFound sqlnet.ora at: $NETDIR/sqlnet.ora" | tee -a $OUTFILE
+            grep -iE "DEFAULT_SDU_SIZE|DEFAULT_TDU_SIZE|DISABLE_OOB|TCP\.NODELAY" "$NETDIR/sqlnet.ora" 2>/dev/null | tee -a $OUTFILE || echo "  (No mitigation parameters configured)" | tee -a $OUTFILE
+        fi
+        
+        if [ -f "$NETDIR/tnsnames.ora" ]; then
+            echo "\nFound tnsnames.ora at: $NETDIR/tnsnames.ora" | tee -a $OUTFILE
+            grep -iE "SDU=|RECV_BUF_SIZE|SEND_BUF_SIZE" "$NETDIR/tnsnames.ora" 2>/dev/null | tee -a $OUTFILE || echo "  (No buffer settings found)" | tee -a $OUTFILE
+        fi
+    done
+done
+
+if [ $FOUND_SQLNET -eq 0 ]; then
+    echo "WARNING: Could not find sqlnet.ora or tnsnames.ora files" | tee -a $OUTFILE
+fi
+
+# -------------------------------------------------------------
+# 4. TCP Retransmissions and Metrics
+# -------------------------------------------------------------
+echo "\n[4] TCP Retransmissions and Metrics" | tee -a $OUTFILE
 echo "----------------------------------------" | tee -a $OUTFILE
 netstat -s | grep -i retrans | tee -a $OUTFILE
 netstat -p tcp | grep -i retrans | tee -a $OUTFILE
 netstat -v $LOCAL_INTERFACE | grep -i "drop\|error\|fail" | tee -a $OUTFILE
 
 # -------------------------------------------------------------
-# 4. Traceroute to Database
+# 5. Traceroute to Database
 # -------------------------------------------------------------
-echo "\n[4] Traceroute to Database ($IP_DB_OCI)" | tee -a $OUTFILE
+echo "\n[5] Traceroute to Database ($IP_DB_OCI)" | tee -a $OUTFILE
 echo "----------------------------------------" | tee -a $OUTFILE
 traceroute $IP_DB_OCI | tee -a $OUTFILE
 
 # -------------------------------------------------------------
-# 5. Ping Test
+# 6. Ping Test
 # -------------------------------------------------------------
-echo "\n[5] Ping Test (20 packets)" | tee -a $OUTFILE
+echo "\n[6] Ping Test (20 packets)" | tee -a $OUTFILE
 echo "----------------------------------------" | tee -a $OUTFILE
 ping -c 20 $IP_DB_OCI | tee -a $OUTFILE
 
 # -------------------------------------------------------------
-# 6. Interface Statistics
+# 7. Interface Statistics
 # -------------------------------------------------------------
-echo "\n[6] Interface Statistics ($LOCAL_INTERFACE)" | tee -a $OUTFILE
+echo "\n[7] Interface Statistics ($LOCAL_INTERFACE)" | tee -a $OUTFILE
 echo "----------------------------------------" | tee -a $OUTFILE
 entstat -d $LOCAL_INTERFACE | tee -a $OUTFILE
 
 # -------------------------------------------------------------
-# 7. CPU Diagnostics
+# 8. CPU Diagnostics
 # -------------------------------------------------------------
-echo "\n[7] CPU Diagnostics" | tee -a $OUTFILE
+echo "\n[8] CPU Diagnostics" | tee -a $OUTFILE
 echo "----------------------------------------" | tee -a $OUTFILE
 echo "CPU Configuration:" | tee -a $OUTFILE
 lsdev -Cc processor | tee -a $OUTFILE
@@ -205,9 +247,9 @@ echo "\nLoad Averages:" | tee -a $OUTFILE
 uptime | tee -a $OUTFILE
 
 # -------------------------------------------------------------
-# 8. Memory Diagnostics
+# 9. Memory Diagnostics
 # -------------------------------------------------------------
-echo "\n[8] Memory Diagnostics" | tee -a $OUTFILE
+echo "\n[9] Memory Diagnostics" | tee -a $OUTFILE
 echo "----------------------------------------" | tee -a $OUTFILE
 echo "Global Memory Summary:" | tee -a $OUTFILE
 svmon -G | tee -a $OUTFILE
@@ -221,9 +263,9 @@ ps aux | head -1 | tee -a $OUTFILE
 ps aux | sort -rn -k 4 | head -20 | tee -a $OUTFILE
 
 # -------------------------------------------------------------
-# 9. Disk I/O Diagnostics
+# 10. Disk I/O Diagnostics
 # -------------------------------------------------------------
-echo "\n[9] Disk I/O Diagnostics" | tee -a $OUTFILE
+echo "\n[10] Disk I/O Diagnostics" | tee -a $OUTFILE
 echo "----------------------------------------" | tee -a $OUTFILE
 echo "Disk Statistics:" | tee -a $OUTFILE
 iostat -D 1 5 | tee -a $OUTFILE
@@ -233,9 +275,9 @@ echo "\nInode Usage:" | tee -a $OUTFILE
 df -i | tee -a $OUTFILE
 
 # -------------------------------------------------------------
-# 10. Network Connection State
+# 11. Network Connection State
 # -------------------------------------------------------------
-echo "\n[10] Network Connection Analysis" | tee -a $OUTFILE
+echo "\n[11] Network Connection Analysis" | tee -a $OUTFILE
 echo "----------------------------------------" | tee -a $OUTFILE
 echo "Established Connections:" | tee -a $OUTFILE
 netstat -an | grep ESTABLISHED | wc -l | tee -a $OUTFILE
@@ -245,9 +287,9 @@ echo "\nConnections to Database ($IP_DB_OCI):" | tee -a $OUTFILE
 netstat -an | grep $IP_DB_OCI | tee -a $OUTFILE
 
 # -------------------------------------------------------------
-# 11. System Error Logs
+# 12. System Error Logs
 # -------------------------------------------------------------
-echo "\n[11] System Error Logs" | tee -a $OUTFILE
+echo "\n[12] System Error Logs" | tee -a $OUTFILE
 echo "----------------------------------------" | tee -a $OUTFILE
 echo "Recent Error Log Entries:" | tee -a $OUTFILE
 errpt | head -50 | tee -a $OUTFILE
@@ -255,9 +297,9 @@ echo "\nSystem Uptime:" | tee -a $OUTFILE
 uptime | tee -a $OUTFILE
 
 # -------------------------------------------------------------
-# 12. TCPDUMP - NETWORK PACKET CAPTURE
+# 13. TCPDUMP - NETWORK PACKET CAPTURE
 # -------------------------------------------------------------
-echo "\n[12] Starting TCPDUMP (${TIME_TO_COLLECT_TCPDUMP} seconds)" | tee -a $OUTFILE
+echo "\n[13] Starting TCPDUMP (${TIME_TO_COLLECT_TCPDUMP} seconds)" | tee -a $OUTFILE
 echo "----------------------------------------" | tee -a $OUTFILE
 echo "Capturing traffic to: $IP_DB_OCI:${DB_PORT}" | tee -a $OUTFILE
 
@@ -316,9 +358,9 @@ else
 fi
 
 # -------------------------------------------------------------
-# 13. COMPLETION
+# 14. COMPLETION
 # -------------------------------------------------------------
-echo "\n[13] DIAGNOSTIC COMPLETE" | tee -a $OUTFILE
+echo "\n[14] DIAGNOSTIC COMPLETE" | tee -a $OUTFILE
 echo "========================================" | tee -a $OUTFILE
 echo "Output log file: $OUTFILE" | tee -a $OUTFILE
 echo "PCAP file: $PCAPFILE" | tee -a $OUTFILE
