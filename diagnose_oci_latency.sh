@@ -5,58 +5,128 @@
 # ============================================================================
 # *** IMPORTANT: YOU MUST RUN THIS SCRIPT AS ROOT ***
 #
-# Run as root:
-#   su -
-#   ./diagnose_oci_latency.sh <IP_DB_OCI> <LOCAL_INTERFACE> <DB_PORT> <TIME_TO_COLLECT_TCPDUMP>
-#
-# Or with sudo:
-#   sudo ./diagnose_oci_latency.sh <IP_DB_OCI> <LOCAL_INTERFACE> <DB_PORT> <TIME_TO_COLLECT_TCPDUMP>
-#
-# ============================================================================
-# USAGE (COPY AND PASTE THIS):
-#   ./diagnose_oci_latency.sh <IP_DB_OCI> <LOCAL_INTERFACE> <DB_PORT> <TIME_TO_COLLECT_TCPDUMP>
+# USAGE (USE FLAGS TO AVOID CONFUSION):
+#   sudo ./diagnose_oci_latency.sh --db-ip <IP> --interface <INTERFACE> --db-port <PORT> --time <SECONDS>
 #
 # EXAMPLE:
-#   sudo ./diagnose_oci_latency.sh 10.50.20.15 ent0 1521 60
+#   sudo ./diagnose_oci_latency.sh --db-ip 100.112.1.74 --interface ent0 --db-port 1521 --time 60
 #
-# WHAT EACH PARAMETER MEANS:
-#   IP_DB_OCI              = The IP address of your Oracle database (example: 10.50.20.15)
-#   LOCAL_INTERFACE        = Your network interface (example: ent0)
-#   DB_PORT                = The database port number (usually 1521)
-#   TIME_TO_COLLECT_TCPDUMP = How many seconds to capture network traffic (example: 60)
+# WHAT EACH FLAG MEANS:
+#   --db-ip       = The IP address of your Oracle database (example: 100.112.1.74)
+#   --interface   = Your network interface (example: ent0)
+#   --db-port     = The database port number (usually 1521)
+#   --time        = How many seconds to capture network traffic (example: 60)
+#
 # ============================================================================
 
-# Check if exactly 4 parameters were provided
-if [ $# -ne 4 ]; then
+# Function to show usage
+show_usage() {
     echo ""
     echo "========================================================"
-    echo "ERROR: You must provide exactly 4 parameters!"
+    echo "AIX OS DIAGNOSTICS AND NETWORK CAPTURE SCRIPT"
     echo "========================================================"
     echo ""
     echo "*** IMPORTANT: RUN THIS SCRIPT AS ROOT ***"
     echo ""
     echo "USAGE:"
-    echo "  sudo $0 <IP_DB_OCI> <LOCAL_INTERFACE> <DB_PORT> <TIME_TO_COLLECT_TCPDUMP>"
+    echo "  sudo $0 --db-ip <IP> --interface <INTERFACE> --db-port <PORT> --time <SECONDS>"
     echo ""
     echo "EXAMPLE:"
-    echo "  sudo $0 10.50.20.15 ent0 1521 60"
+    echo "  sudo $0 --db-ip 100.112.1.74 --interface ent0 --db-port 1521 --time 60"
     echo ""
-    echo "WHAT EACH PARAMETER MEANS:"
-    echo "  IP_DB_OCI              = The IP address of your Oracle database"
-    echo "  LOCAL_INTERFACE        = Your network interface (usually ent0 or similar)"
-    echo "  DB_PORT                = The database port (usually 1521)"
-    echo "  TIME_TO_COLLECT_TCPDUMP = How many seconds to capture network traffic"
+    echo "WHAT EACH FLAG MEANS:"
+    echo "  --db-ip       = The IP address of your Oracle database"
+    echo "  --interface   = Your network interface (usually ent0)"
+    echo "  --db-port     = The database port (usually 1521)"
+    echo "  --time        = How many SECONDS to capture traffic (60 = 1 minute, 120 = 2 minutes)"
     echo ""
     echo "========================================================"
     echo ""
     exit 1
+}
+
+# Initialize variables
+IP_DB_OCI=""
+LOCAL_INTERFACE=""
+DB_PORT=""
+TIME_TO_COLLECT_TCPDUMP=""
+
+# Parse command line arguments with flags
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --db-ip)
+            IP_DB_OCI="$2"
+            shift 2
+            ;;
+        --interface)
+            LOCAL_INTERFACE="$2"
+            shift 2
+            ;;
+        --db-port)
+            DB_PORT="$2"
+            shift 2
+            ;;
+        --time)
+            TIME_TO_COLLECT_TCPDUMP="$2"
+            shift 2
+            ;;
+        -h|--help)
+            show_usage
+            ;;
+        *)
+            echo "ERROR: Unknown parameter: $1"
+            show_usage
+            ;;
+    esac
+done
+
+# Validate that all required parameters were provided
+if [ -z "$IP_DB_OCI" ] || [ -z "$LOCAL_INTERFACE" ] || [ -z "$DB_PORT" ] || [ -z "$TIME_TO_COLLECT_TCPDUMP" ]; then
+    echo ""
+    echo "ERROR: Missing required parameters!"
+    echo ""
+    if [ -z "$IP_DB_OCI" ]; then
+        echo "  Missing: --db-ip (Database IP address)"
+    fi
+    if [ -z "$LOCAL_INTERFACE" ]; then
+        echo "  Missing: --interface (Network interface)"
+    fi
+    if [ -z "$DB_PORT" ]; then
+        echo "  Missing: --db-port (Database port)"
+    fi
+    if [ -z "$TIME_TO_COLLECT_TCPDUMP" ]; then
+        echo "  Missing: --time (Capture duration in seconds)"
+    fi
+    show_usage
 fi
 
-# Assign parameters to variables with clear names
-IP_DB_OCI=$1
-LOCAL_INTERFACE=$2
-DB_PORT=$3
-TIME_TO_COLLECT_TCPDUMP=$4
+# Validate DB_PORT is a number between 1 and 65535
+if ! echo "$DB_PORT" | grep -Eq '^[0-9]+$' || [ "$DB_PORT" -lt 1 ] || [ "$DB_PORT" -gt 65535 ]; then
+    echo ""
+    echo "ERROR: --db-port must be a valid port number (1-65535)"
+    echo "You provided: $DB_PORT"
+    echo ""
+    echo "Common database ports:"
+    echo "  1521 = Oracle default port"
+    echo "  1522, 1523, etc. = Custom Oracle ports"
+    echo ""
+    exit 1
+fi
+
+# Validate TIME is a reasonable number (1-7200 seconds = max 2 hours)
+if ! echo "$TIME_TO_COLLECT_TCPDUMP" | grep -Eq '^[0-9]+$' || [ "$TIME_TO_COLLECT_TCPDUMP" -lt 1 ] || [ "$TIME_TO_COLLECT_TCPDUMP" -gt 7200 ]; then
+    echo ""
+    echo "ERROR: --time must be between 1 and 7200 seconds (max 2 hours)"
+    echo "You provided: $TIME_TO_COLLECT_TCPDUMP"
+    echo ""
+    echo "Common values:"
+    echo "  60   = 1 minute"
+    echo "  120  = 2 minutes"
+    echo "  300  = 5 minutes"
+    echo "  600  = 10 minutes"
+    echo ""
+    exit 1
+fi
 
 # Generate output file names with timestamp
 OUTFILE="oci_diagnosis_$(date +%Y%m%d_%H%M%S).log"
