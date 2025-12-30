@@ -1,0 +1,1 @@
+samples=73991 stall>50ms=29 stall>200ms=18 max_active_gap=0.871398

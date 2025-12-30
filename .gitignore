@@ -1,1 +1,8 @@
 notes.out
+sqlnet_push_all.txt
+# Exclude large raw data files from git
+Analysis/out_compare/pre/sqlnet_push_all.txt
+Analysis/out_compare/post/sqlnet_push_all.txt
+
+# Exclude all large intermediate files
+**/sqlnet_push_all.txt

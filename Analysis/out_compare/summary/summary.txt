@@ -1,0 +1,38 @@
+SQL*Net PRE/POST (tcpdump+awk only)
+Client=192.168.84.67 DB=100.112.1.74:1521
+PRE=oci_tcpdump_20251212_155703.pcap
+POST=oci_tcpdump_20251229_173137.pcap
+
+[sanity] sqlnet_push_lines:
+PRE : 3752263
+POST: 3996062
+
+[span seconds] sqlnet_push_span_s:
+PRE : 179.957195
+POST: 182.231568
+
+[most-active port]
+PRE : 33502
+POST: 60538
+
+[elapsed N=20/200/1000 on most-active]
+PRE  N=20 : 0.018644
+POST N=20 : 0.019475
+PRE  N=200 : 0.199006
+POST N=200 : 0.177724
+PRE  N=1000 : 0.889719
+POST N=1000 : 0.945611
+
+[active-gap stalls + percentiles on most-active]
+PRE stalls: samples=73991 stall>50ms=29 stall>200ms=18 max_active_gap=0.871398
+POST stalls: samples=81334 stall>50ms=36 stall>200ms=21 max_active_gap=0.962716
+PRE pct: N=73991 P50=0.00138712 P95=0.00195289 P99=0.00438499 MAX=0.871398
+POST pct: N=81334 P50=0.00138783 P95=0.00176716 P99=0.00340414 MAX=0.962716
+
+[response-delay percentiles across ALL sessions]
+PRE : N=1877254 P50=0.001513 P95=0.002406 P99=0.005664 MAX=29.501471
+POST: N=1998947 P50=0.001510 P95=0.002229 P99=0.004727 MAX=14.896076
+
+[response-delay tail counters across ALL sessions]
+PRE : >50ms=835 >200ms=282 >1s=59 >5s=33 >10s=12
+POST: >50ms=1450 >200ms=207 >1s=27 >5s=10 >10s=4
