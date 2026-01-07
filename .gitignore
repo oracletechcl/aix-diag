@@ -6,3 +6,5 @@ Analysis/out_compare/post/sqlnet_push_all.txt
 
 # Exclude all large intermediate files
 **/sqlnet_push_all.txt
+
+tcpdumps

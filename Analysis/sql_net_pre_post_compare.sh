@@ -1,12 +1,42 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CLIENT_IP="192.168.84.67"
-DB_IP="100.112.1.74"
+# CLIENT_IP="192.168.84.67" PROD
+# DB_IP="100.112.1.74" PROD
+CLIENT_IP="192.168.77.18"
+DB_IP="192.168.78.14"
 DB_PORT="1521"
-PRE_PCAP="oci_tcpdump_20251212_155703.pcap"
-POST_PCAP="oci_tcpdump_20251229_173137.pcap"
-OUTDIR="out_compare"
+
+# # Baseline to stage 1
+# PRE_PCAP="/home/opc/DevOps/RIPLEY/aix-diag/tcpdumps/preprod-test/baseline/oci_tcpdump_20251230_171429.pcap"
+# POST_PCAP="/home/opc/DevOps/RIPLEY/aix-diag/tcpdumps/preprod-test/stage_1/oci_tcpdump_20251230_172640.pcap"
+# #stage
+# OUTDIR="out_compare_baseline_stage1"
+
+# # stage 1 a stage 2
+# PRE_PCAP="/home/opc/DevOps/RIPLEY/aix-diag/tcpdumps/preprod-test/stage_1/oci_tcpdump_20251230_172640.pcap"
+# POST_PCAP="/home/opc/DevOps/RIPLEY/aix-diag/tcpdumps/preprod-test/stage_2/oci_tcpdump_20251230_175323.pcap"
+# #stage
+# OUTDIR="out_compare_stage1_stage2"
+
+
+# # stage 2 a stage 3
+# PRE_PCAP="/home/opc/DevOps/RIPLEY/aix-diag/tcpdumps/preprod-test/stage_2/oci_tcpdump_20251230_175323.pcap"
+# POST_PCAP="/home/opc/DevOps/RIPLEY/aix-diag/tcpdumps/preprod-test/stage_3/oci_tcpdump_20251230_180643.pcap"
+# #stage
+# OUTDIR="out_compare_stage2_stage3"
+
+# # stage 3 a stage 4
+# PRE_PCAP="/home/opc/DevOps/RIPLEY/aix-diag/tcpdumps/preprod-test/stage_3/oci_tcpdump_20251230_180643.pcap"
+# POST_PCAP="/home/opc/DevOps/RIPLEY/aix-diag/tcpdumps/preprod-test/stage_4/oci_tcpdump_20251230_181502.pcap"
+# #stage
+# OUTDIR="out_compare_stage3_stage4"
+
+# stage baseline a stage 4
+PRE_PCAP="/home/opc/DevOps/RIPLEY/aix-diag/tcpdumps/preprod-test/baseline/oci_tcpdump_20251230_171429.pcap"
+POST_PCAP="/home/opc/DevOps/RIPLEY/aix-diag/tcpdumps/preprod-test/stage_4/oci_tcpdump_20251230_181502.pcap"
+#stage
+OUTDIR="out_compare_baseline_stage4"
 
 die(){ echo "ERROR: $*" >&2; exit 1; }
 
