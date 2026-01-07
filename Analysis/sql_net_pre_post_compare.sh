@@ -33,7 +33,7 @@ DB_PORT="1521"
 # OUTDIR="out_compare_stage3_stage4"
 
 # stage baseline a stage 4
-PRE_PCAP="/home/opc/DevOps/RIPLEY/aix-diag/tcpdumps/12-12/oci_tcpdump_20251229_173137.pcap"
+PRE_PCAP="/home/opc/DevOps/RIPLEY/aix-diag/tcpdumps/12-12/oci_tcpdump_20251212_155703.pcap"
 POST_PCAP="/home/opc/DevOps/RIPLEY/aix-diag/tcpdumps/06-01/stage4/oci_tcpdump_20260107_000534_Stage4.pcap"
 #stage
 OUTDIR="/home/opc/DevOps/RIPLEY/aix-diag/Analysis/prod-06-01-2025/out/Dec12-Ene06"
