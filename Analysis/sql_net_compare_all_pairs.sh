@@ -2,34 +2,40 @@
 set -euo pipefail
 
 CLIENT_IP="192.168.84.67"
-DB_IP="100.112.1.74" 
+DB_IP="100.112.1.74"
 DB_PORT="1521"
+BASEDIR="/home/opc/DevOps/RIPLEY/aix-diag/Analysis/prod-06-01-2025/out"
+TCPDUMPDIR="/home/opc/DevOps/RIPLEY/aix-diag/tcpdumps"
 
-# stage baseline a stage 4
-PRE_PCAP="/home/opc/DevOps/RIPLEY/aix-diag/tcpdumps/12-12/oci_tcpdump_20251212_155703.pcap"
-POST_PCAP="/home/opc/DevOps/RIPLEY/aix-diag/tcpdumps/06-01/stage4/oci_tcpdump_20260107_000534_Stage4.pcap"
-#stage
-OUTDIR="/home/opc/DevOps/RIPLEY/aix-diag/Analysis/prod-06-01-2025/out/Dec12-Ene06"
+# Define dataset pairs: PAIR_NAME:PRE_PCAP:POST_PCAP
+declare -A PAIRS=(
+  ["Dec12-Ene06"]="${TCPDUMPDIR}/12-12/oci_tcpdump_20251212_155703.pcap:${TCPDUMPDIR}/06-01/stage4/oci_tcpdump_20260107_000534_Stage4.pcap"
+  ["Dec29-Ene06"]="${TCPDUMPDIR}/29-12/oci_tcpdump_20251229_173137.pcap:${TCPDUMPDIR}/06-01/stage4/oci_tcpdump_20260107_000534_Stage4.pcap"
+  ["Dec12-Ene07"]="${TCPDUMPDIR}/12-12/oci_tcpdump_20251212_155703.pcap:${TCPDUMPDIR}/07-01/oci_tcpdump_20260107_164719.pcap"
+)
 
 die(){ echo "ERROR: $*" >&2; exit 1; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    -p|--pair) PAIR="$2"; shift 2;;
     -c|--client) CLIENT_IP="$2"; shift 2;;
-    -d|--db)     DB_IP="$2"; shift 2;;
-    -p|--port)   DB_PORT="$2"; shift 2;;
-    -pre|--pre)  PRE_PCAP="$2"; shift 2;;
-    -post|--post) POST_PCAP="$2"; shift 2;;
-    -o|--out)    OUTDIR="$2"; shift 2;;
+    -d|--db) DB_IP="$2"; shift 2;;
+    -port) DB_PORT="$2"; shift 2;;
     *) die "Unknown arg: $1";;
   esac
 done
 
-[[ -n "$CLIENT_IP" ]] || die "Missing -c CLIENT_IP"
-[[ -n "$DB_IP"     ]] || die "Missing -d DB_IP"
-[[ -n "$PRE_PCAP"  ]] || die "Missing -pre PRE_PCAP"
-[[ -n "$POST_PCAP" ]] || die "Missing -post POST_PCAP"
+PAIR="${PAIR:-Dec12-Ene07}"
+
+[[ -n "${PAIRS[$PAIR]}" ]] || die "Unknown PAIR: $PAIR. Available: ${!PAIRS[@]}"
+
+IFS=':' read -r PRE_PCAP POST_PCAP <<< "${PAIRS[$PAIR]}"
+OUTDIR="$BASEDIR/$PAIR"
+
 command -v tcpdump >/dev/null 2>&1 || die "tcpdump not found"
+[[ -f "$PRE_PCAP" ]] || die "PRE_PCAP not found: $PRE_PCAP"
+[[ -f "$POST_PCAP" ]] || die "POST_PCAP not found: $POST_PCAP"
 
 mkdir -p "$OUTDIR"/{pre,post,summary}
 
@@ -171,7 +177,7 @@ run_one "post" "$POST_PCAP"
 
 SUM="$OUTDIR/summary/summary.txt"
 {
-  echo "SQL*Net PRE/POST (tcpdump+awk only)"
+  echo "SQL*Net PRE/POST Analysis - PAIR=$PAIR"
   echo "Client=$CLIENT_IP DB=$DB_IP:$DB_PORT"
   echo "PRE=$PRE_PCAP"
   echo "POST=$POST_PCAP"
@@ -209,4 +215,4 @@ SUM="$OUTDIR/summary/summary.txt"
   echo -n "POST: "; cat "$OUTDIR/post/resp_delay_tailcounts.txt"
 } > "$SUM"
 
-echo "DONE. Summary: $SUM"
+echo "✓ DONE. Summary: $SUM"

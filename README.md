@@ -10,6 +10,14 @@ This script requires root privileges to run tcpdump. Use `sudo` or login as root
 
 ## How to Use (STEP BY STEP)
 
+### Quick Prep Checklist
+
+- Confirm you are on the AIX host where traffic originates and that you have root or sudo that can run `tcpdump`.
+- Make the script executable once: `chmod +x diagnose_oci_latency.sh`.
+- Verify `tcpdump` is present: `which tcpdump` (install it if missing).
+- Ensure `/tmp` has at least 500 MB free so the pcap + log can be written: `df -m /tmp`.
+- Pick a capture window when the issue is reproducible so the packets include the problematic period.
+
 ### Step 1: Get Your Information Ready
 
 You need 4 pieces of information:
@@ -20,7 +28,8 @@ You need 4 pieces of information:
 
 2. **Network Interface**: Your AIX network interface name
    - Usually this is `ent0`
-   - To find it, run: `ifconfig -a` and look for your active interface
+   - To find it, run: `ifconfig -a` and look for the interface with your production IP address
+   - If multiple are active, prefer the one carrying traffic to the DB (check `netstat -rn` to match the default route)
 
 3. **Database Port**: The database port number
    - Usually this is `1521` (Oracle default)
@@ -31,6 +40,10 @@ You need 4 pieces of information:
    - Use `120` for 2 minutes
    - Use `300` for 5 minutes
    - **WARNING: Don't confuse this with the port number!**
+
+**Optional sanity check before running:**
+- Confirm DNS or direct IP reaches the DB: `ping -c 3 <db-ip>`
+- If ping is blocked, try a TCP check: `telnet <db-ip> <db-port>` (Ctrl+] then `quit` to exit)
 
 ### Step 2: Run the Script WITH FLAGS
 
@@ -46,6 +59,8 @@ sudo ./diagnose_oci_latency.sh --db-ip 100.112.1.74 --interface ent0 --db-port 1
 - `1521` → Your database port number
 - `60` → How many seconds to capture (NOT the port!)
 
+Run from the directory containing the script so the outputs land in the same location.
+
 ### Step 3: Wait for Completion
 
 The script will:
@@ -53,6 +68,8 @@ The script will:
 2. Run all diagnostic commands
 3. Capture network traffic for the specified time
 4. Create two output files
+
+Typical runtime is `capture time + ~10-20 seconds` for the diagnostics to finish. Avoid Ctrl+C unless absolutely necessary; an incomplete pcap is hard to reuse.
 
 **DO NOT STOP THE SCRIPT WHILE IT'S RUNNING!** Wait for it to complete.
 
@@ -62,6 +79,11 @@ When complete, you'll see:
 ```
 Output log file: oci_diagnosis_YYYYMMDD_HHMMSS.log
 PCAP file: /tmp/oci_tcpdump_YYYYMMDD_HHMMSS.pcap
+```
+
+Both files are in the directory you ran the script from (pcap lives in `/tmp`). Compress them together if large:
+```bash
+tar czf oci_diag_bundle.tgz oci_diagnosis_YYYYMMDD_HHMMSS.log /tmp/oci_tcpdump_YYYYMMDD_HHMMSS.pcap
 ```
 
 Send **BOTH files** to your support team.
